@@ -1,6 +1,7 @@
 import Logger from "../../app/logger.js";
 import ReviewsStore from "../../app/reviews-store.js";
 import Slack from "../../app/slack.js";
+import { getReviewSkipReason } from "../../app/review-filter.js";
 import { GoogleApis } from "googleapis";
 import fs from 'fs';
 
@@ -62,11 +63,18 @@ export default class PlayStoreWatcher {
             })
             .then((reviews) => {
                 logger.log(`New reviews: ${reviews.length} items`);
-                return reviews.forEach((item) => {
-                    logger.log("Sending items to slack...");
+                reviews.forEach((item) => {
                     this.reviewsStore.put(item);
+                    const skipReason = getReviewSkipReason(item, this.config);
+
+                    if (skipReason) {
+                        logger.log(`Review ${item.id} skipped (${skipReason})`);
+                        return;
+                    }
+
+                    logger.log("Sending items to slack...");
                     Slack.postMessage(item, this.config);
-                })
+                });
             });
     }
 
